@@ -19,7 +19,7 @@ This library provides a Python 3 interface to query information from a Telstra S
 ## Links
 
 * [GitHub](https://github.com/hatdz/telstra-smart-modem/)
-* [PyPi](https://pypi.org/project/telstra-smart-modem/)
+* [PyPI](https://pypi.org/project/telstra-smart-modem/)
 
 ## Installation
 

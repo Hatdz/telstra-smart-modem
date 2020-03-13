@@ -1,5 +1,12 @@
+# VSCode:
+.vscode/
+
+# PyCharm:
+.idea/
+
 # Python files:
 __pycache__/
+venv/
 build/
 dist/
 *.egg-info/

@@ -4,36 +4,40 @@
 # reverse engineered from srp-min.js (sent from the modem). It only functions as a client/user.
 
 import hashlib
-import random
+import secrets
+
 
 # Convert Int to hex string
 def toHex(number: int) -> str:
-	hexString = format(number, 'x')
-	if 1 == len(hexString) % 2:
-		hexString = '0' + hexString
-	return hexString
+    hexString = format(number, 'x')
+    if 1 == len(hexString) % 2:
+        hexString = '0' + hexString
+    return hexString
+
 
 # SHA256 hash helper
-def hash(value: bytes, outformat: str = 'HEX'):
-	h = hashlib.sha256()
-	h.update(value)
-	if outformat == 'BIN':
-		return h.digest()
-	elif outformat == 'INT':
-		return int.from_bytes(h.digest(), byteorder='big')
-	else:
-		return h.hexdigest()
+def sha256(value: bytes, outformat: str = 'HEX'):
+    h = hashlib.sha256()
+    h.update(value)
+    if outformat == 'BIN':
+        return h.digest()
+    elif outformat == 'INT':
+        return int.from_bytes(h.digest(), byteorder='big')
+    else:
+        return h.hexdigest()
+
 
 # Calculate the 'u' variable in SRP
 def calculate_u(A: str, B: str) -> int:
-	A_bytes = A.to_bytes(256, 'big', signed=False)
-	B_bytes = B.to_bytes(256, 'big', signed=False)
-	hashed = hash(A_bytes + B_bytes, outformat='INT')
-	return hashed
+    A_bytes = A.to_bytes(256, 'big', signed=False)
+    B_bytes = B.to_bytes(256, 'big', signed=False)
+    hashed = sha256(A_bytes + B_bytes, outformat='INT')
+    return hashed
+
 
 # Get Random integer for the 'a' client variable in SRP
 def getRandomA() -> int:
-	return random.SystemRandom().getrandbits(2048) % N
+    return secrets.randbits(256)
 
 
 # Shared SRP variables:
@@ -45,7 +49,7 @@ cd7f48a9da04fd50e8083969edb767b0cf6095179a163ab3661a05fbd5faaae82918a9962f0b93b8
 5ea77a2775d2ecfa032cfbdbf52fb3786160279004e57ae6af874e7303ce53299ccc041c7bc308d82a5698f3a8d0c38271ae35f8e9dbfbb6
 94b5c803d89f7ae435de236d525f54759b65e372fcd68ef20fa7111f9e4aff73
 '''
-N = N.replace(" ", "").replace("\n", "")
+N = N.replace("\n", "")
 N = int(N, 16)
 
 # Magic numbers:
@@ -54,41 +58,41 @@ magic_C = int(magic_C, 16)
 # This one stays in hex format. Likely some kind of shared secret.
 magic_u = '4a76a9a2402bdd18123389b72ebbda50a30f65aedb90d7273130edea4b29cc4c'
 
+
 # SRP User class for authenticating with the Telstra Smart Modem.
 class User:
 
-	def __init__(self, username: str, password: str):
-		self.username = username
-		self.password = password
+    def __init__(self, username: str, password: str):
+        self.username = username
+        self.password = password
 
-	# Return the calculated 'A' variable in SRP to send to the server.
-	def start_authentication(self) -> str:
-		self.a = getRandomA()
+    # Return the calculated 'A' variable in SRP to send to the server.
+    def start_authentication(self) -> str:
+        A = 0
+        while A == 0:
+            self.a = getRandomA()
+            A = pow(g, self.a, N)
 
-		A = 0
-		while A == 0:
-			A = pow(g, self.a, N)
+        self.A = A
+        self.A_hex = toHex(A)
+        return self.A_hex
 
-		self.A = A
-		self.A_hex = toHex(A)
-		return self.A_hex
+    # Take the 's' and 'B' SRP variables from the server and calculate
+    # the 'M' SRP variable to send back to the server.
+    def process_challenge(self, s_hex: str, B_hex: str) -> str:
+        B = int(B_hex, 16)
+        u = calculate_u(self.A, B)
 
-	# Take the 's' and 'B' SRP variables from the server and calculate 
-	# the 'M' SRP variable to send back to the server.
-	def process_challenge(self, s_hex: str, B_hex: str) -> str:
-		B = int(B_hex, 16)
-		u = calculate_u(self.A, B)
+        user_pass = sha256(f"{self.username}:{self.password}".encode())
+        n = sha256(bytes.fromhex(s_hex + user_pass), 'INT')
 
-		user_pass = hash(f"{self.username}:{self.password}".encode())
-		n = hash(bytes.fromhex(s_hex + user_pass), 'INT')
+        a = (magic_C * pow(g, n, N)) % N
+        b = (self.a + ((u * n) % N)) % N
+        e = pow(((B - a) % N), b, N)
 
-		mya = (magic_C * pow(g, n, N)) % N
-		myb = (self.a + ((u * n) % N)) % N
-		mye = pow(((B - mya) % N), myb, N)
+        e_bytes = e.to_bytes(256, byteorder='big')
 
-		mye_bytes = mye.to_bytes(256, byteorder='big')
-
-		_B = hash(mye_bytes)
-		_e = hash(self.username.encode())
-		M = hash(bytes.fromhex(magic_u + _e + s_hex + self.A_hex + B_hex + _B))
-		return M
+        _B = sha256(e_bytes)
+        _e = sha256(self.username.encode())
+        M = sha256(bytes.fromhex(magic_u + _e + s_hex + self.A_hex + B_hex + _B))
+        return M

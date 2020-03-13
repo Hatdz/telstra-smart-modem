@@ -1,1 +1,1 @@
-from telstra_smart_modem.modem import *
+from telstra_smart_modem.modem import Modem

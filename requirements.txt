@@ -1,2 +1,8 @@
-requests>=2.22
+# Package building:
+setuptools>=45.2.0
+wheel>=0.34.2
+twine>=3.1.1
+
+# Project requirements:
+requests>=2.23.0
 beautifulsoup4>=4.8.2
